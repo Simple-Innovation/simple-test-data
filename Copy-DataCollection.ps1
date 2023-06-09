@@ -10,7 +10,7 @@ It will copy any child item in the source folder and generate a guaranteed uniqu
 .EXAMPLE
 #>
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 param (
     # The folder holding the seed data
     [Parameter(Mandatory)]
@@ -31,26 +31,47 @@ param (
 $SourceItemCollection = Get-ChildItem `
     -Path:$SourceFolder
 
-$SourceItem = $SourceItemCollection[$(Get-Random -Minimum:0 -Maximum:$($SourceItemCollection.Length-1))]
+[double]$MaximumByteCurrent = 0
 
-$TargetItemName = switch ($SourceItem.GetType()) {
-    "System.IO.DirectoryInfo" {
-        [System.IO.Path]::GetFileNameWithoutExtension([System.IO.Path]::GetRandomFileName())   
+while ($MaximumByteCurrent -lt $MaximumByteTotal) {
+    $SourceItem = $SourceItemCollection[$(Get-Random -Minimum:0 -Maximum:$($SourceItemCollection.Length - 1))]
+
+    switch ($SourceItem.GetType()) {
+        "System.IO.DirectoryInfo" {
+            $SourceItemLength = $(Get-ChildItem $SourceItem.FullName -Recurse | Measure-Object -Property Length -Sum).Sum
+            $SourceItemPath = "$($SourceItem.FullName)/*"
+            $TargetItemName = [System.IO.Path]::GetFileNameWithoutExtension([System.IO.Path]::GetRandomFileName())
+            $TargetItemPath = Join-Path `
+                -Path:$TargetFolder `
+                -ChildPath:$TargetItemName
+            if ($PSCmdlet.ShouldProcess("New-Item", $TargetItemPath)) {
+                New-Item `
+                    -Path:$TargetItemPath `
+                    -ItemType:Directory
+            }
+        }
+        "System.IO.FileInfo" {
+            $SourceItemLength = $SourceItem.Length
+            $SourceItemPath = $SourceItem.FullName
+            $TargetItemName = [System.IO.Path]::GetFileNameWithoutExtension([System.IO.Path]::GetRandomFileName()) + $SourceItem.Extension   
+            $TargetItemPath = Join-Path `
+                -Path:$TargetFolder `
+                -ChildPath:$TargetItemName
+        }
+        default {
+            throw $SourceItem.GetType()
+        }
     }
-    "System.IO.FileInfo" {
-        [System.IO.Path]::GetRandomFileName()   
+
+    if ($PSCmdlet.ShouldProcess("Copy-Item", $SourceItemPath)) {
+        Write-Verbose -Message:"Copy-Item -Path:""$SourceItemPath"" -Destination:""$TargetItemPath"" -Recurse"
+        Copy-Item `
+            -Path:"$SourceItemPath" `
+            -Destination:"$TargetItemPath" `
+            -Recurse
     }
-    default {
-        throw $SourceItem.GetType()
-    }
+
+    $MaximumByteCurrent = $MaximumByteCurrent + $SourceItemLength
+    Write-Verbose -Message:"MaximumByteTotal: $($MaximumByteTotal.ToString('N0')) MaximumByteCurrent: $($MaximumByteCurrent.ToString('N0'))"
 }
 
-$TargetItemPath = Join-Path `
-    -Path:$TargetFolder `
-    -ChildPath:$TargetItemName
-
-
-Copy-Item `
-    -Path:$SourceItem.FullName `
-    -Destination:$TargetItemPath `
-    -Recurse
