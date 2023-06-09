@@ -10,8 +10,9 @@ It will copy any child item in the source folder and generate a guaranteed uniqu
 .EXAMPLE
 #>
 
-[CmdletBinding(SupportsShouldProcess)]
-param (
+function Copy-DataCollection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param (
     # The folder holding the seed data
     [Parameter(Mandatory)]
     [string]
@@ -28,13 +29,25 @@ param (
     $MaximumByteTotal
 )
 
-$SourceItemCollection = Get-ChildItem `
-    -Path:$SourceFolder
+$SourceItemCollection = @(Get-ChildItem `
+    -Path:$SourceFolder)
 
 [double]$MaximumByteCurrent = 0
 
 while ($MaximumByteCurrent -lt $MaximumByteTotal) {
-    $SourceItem = $SourceItemCollection[$(Get-Random -Minimum:0 -Maximum:$($SourceItemCollection.Length - 1))]
+    $SourceIndex = switch ($SourceItemCollection.Length) {
+        0 {
+            throw "No items in source folder"
+        }
+        1 {
+            0
+        }
+        default {
+            Get-Random -Minimum:0 -Maximum:$($SourceItemCollection.Length - 1)
+        }
+    } 
+
+    $SourceItem = $SourceItemCollection[$SourceIndex]
 
     switch ($SourceItem.GetType()) {
         "System.IO.DirectoryInfo" {
@@ -72,6 +85,6 @@ while ($MaximumByteCurrent -lt $MaximumByteTotal) {
     }
 
     $MaximumByteCurrent = $MaximumByteCurrent + $SourceItemLength
-    Write-Verbose -Message:"MaximumByteTotal: $($MaximumByteTotal.ToString('N0')) MaximumByteCurrent: $($MaximumByteCurrent.ToString('N0'))"
+    Write-Verbose -Message:"MaximumByteCurrent: $($MaximumByteCurrent.ToString('N0'))"
 }
-
+}
