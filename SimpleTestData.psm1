@@ -32,7 +32,7 @@ function Copy-DataCollection {
 $SourceItemCollection = @(Get-ChildItem `
     -Path:$SourceFolder)
 
-[double]$MaximumByteCurrent = 0
+[double]$MaximumByteCurrent = $(Get-ChildItem $TargetFolder -Recurse | Measure-Object -Property Length -Sum).Sum
 
 while ($MaximumByteCurrent -lt $MaximumByteTotal) {
     $SourceIndex = switch ($SourceItemCollection.Length) {
@@ -60,7 +60,8 @@ while ($MaximumByteCurrent -lt $MaximumByteTotal) {
             if ($PSCmdlet.ShouldProcess("New-Item", $TargetItemPath)) {
                 New-Item `
                     -Path:$TargetItemPath `
-                    -ItemType:Directory
+                    -ItemType:Directory |
+                    Out-Null
             }
         }
         "System.IO.FileInfo" {
@@ -86,5 +87,9 @@ while ($MaximumByteCurrent -lt $MaximumByteTotal) {
 
     $MaximumByteCurrent = $MaximumByteCurrent + $SourceItemLength
     Write-Verbose -Message:"MaximumByteCurrent: $($MaximumByteCurrent.ToString('N0'))"
+    Write-Progress `
+        -Activity:"Copy" `
+        -Status:"$MaximumByteCurrent/$MaximumByteTotal" `
+        -PercentComplete:$($MaximumByteCurrent/$MaximumByteTotal*100)
 }
 }
